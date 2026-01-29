@@ -1,0 +1,75 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Evidence {
+  id            String   @id @default(cuid())
+  type          String
+  text          String
+  url           String?
+  minutes       Int?
+  steps         Int?
+  place         String?
+  tags          Json
+  attachmentUrl String?
+  createdAt     DateTime @default(now())
+
+  problemLinks ProblemEvidence[]
+}
+
+model Problem {
+  id             String   @id @default(cuid())
+  title          String
+  description    String
+  whoHurts       String
+  whenHappens    String
+  frequencyText  String
+  impactTime     Int?
+  impactMoney    Int?
+  impactPainText String
+  workaround     String
+  metricOne      String
+  scores         Json
+  totalScore     Float
+  createdAt      DateTime @default(now())
+
+  evidenceLinks ProblemEvidence[]
+  studyPack     StudyPack?
+  experiment    Experiment?
+}
+
+model ProblemEvidence {
+  problemId  String
+  evidenceId String
+
+  problem  Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([problemId, evidenceId])
+}
+
+model StudyPack {
+  id        String   @id @default(cuid())
+  problemId String   @unique
+  content   Json
+  createdAt DateTime @default(now())
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
+
+model Experiment {
+  id         String   @id @default(cuid())
+  problemId  String   @unique
+  hypothesis String
+  plan       Json
+  pitchText  String
+  metrics    Json
+  createdAt  DateTime @default(now())
+
+  problem Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+}
