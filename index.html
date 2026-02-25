@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>تنبيهات الأخبار الذكية</title>
+    <style>
+      :root {
+        --bg: #0f172a;
+        --card: #111827;
+        --line: #243148;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family: "Cairo", system-ui, sans-serif;
+      }
+      .wrap {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+      h1, h2 { margin: 0 0 8px; }
+      p { margin: 6px 0; color: var(--muted); }
+      input, button {
+        width: 100%;
+        border-radius: 10px;
+        border: 1px solid #334155;
+        background: #0b1220;
+        color: var(--text);
+        padding: 10px;
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        background: linear-gradient(90deg, #0ea5e9, #38bdf8);
+        border: 0;
+        color: #00111d;
+        font-weight: 700;
+      }
+      .chat {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        min-height: 220px;
+        max-height: 360px;
+        overflow-y: auto;
+      }
+      .msg {
+        padding: 10px;
+        border-radius: 10px;
+        max-width: 90%;
+        line-height: 1.5;
+      }
+      .bot { background: #1f2937; border: 1px solid #374151; }
+      .me { background: #04263b; border: 1px solid #0ea5e9; margin-right: auto; }
+      .row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+      .pill {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid #334155;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      ul { margin: 0; padding-inline: 18px; }
+      li { margin: 6px 0; }
+      .hint {
+        border-right: 3px solid #38bdf8;
+        padding-right: 8px;
+        font-size: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <section class="card">
+        <h1>تنبيهات الأخبار الذكية (بسيط جدًا)</h1>
+        <p>اكتب الخبر الذي تريد متابعته، والمساعد يسأل أسئلة دقيقة ثم يحفظ التنبيه.</p>
+        <p class="hint">ربط API تم نقله إلى الكود البرمجي (JavaScript) وليس في واجهة الصفحة.</p>
+      </section>
+
+      <section class="card">
+        <h2>محادثة بناء التنبيه</h2>
+        <span class="pill">سؤال واحد كل مرة حتى يكتمل التنبيه بدقة</span>
+        <div class="chat" id="chat"></div>
+        <div class="row">
+          <input id="userInput" placeholder="مثال: أريد تنبيه إذا وصل اللاعب الفلاني إلى 60 هدف" />
+          <button id="sendBtn">إرسال</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>التنبيهات المحفوظة</h2>
+        <ul id="subscriptions"></ul>
+      </section>
+
+      <section class="card">
+        <h2>طريقة جلب الأخبار المعتمدة</h2>
+        <p>
+          الطريقة الأفضل: <strong>Hybrid</strong> = Webhooks للمصادر التي تدعم الدفع الفوري + Polling مجدول للمصادر الأخرى،
+          ثم تمرير الخبر إلى الذكاء الاصطناعي للتحقق من التطابق مع التنبيهات المحفوظة.
+        </p>
+      </section>
+    </main>
+
+    <script>
+      const SUBS_KEY = 'ai-news-subscriptions-v3';
+
+      // API config in code (not in UI).
+      // ملاحظة: في الإنتاج الأفضل وضع هذا في Backend Proxy وليس Frontend.
+      const AI_CONFIG = {
+        apiBase: 'https://api.openai.com/v1',
+        apiKey: 'PUT_YOUR_API_KEY_HERE',
+        model: 'gpt-4o-mini'
+      };
+
+      const chatEl = document.getElementById('chat');
+      const subsEl = document.getElementById('subscriptions');
+      const userInput = document.getElementById('userInput');
+
+      const state = {
+        messages: [
+          {
+            role: 'assistant',
+            content:
+              'مرحبًا! صف الخبر الذي تريد تنبيهًا عنه. سأطرح أسئلة محددة (من؟ ماذا؟ أين؟ متى؟ وما الشرط الدقيق؟).'
+          }
+        ]
+      };
+
+      function getSubs() {
+        try {
+          return JSON.parse(localStorage.getItem(SUBS_KEY) || '[]');
+        } catch {
+          return [];
+        }
+      }
+
+      function saveSubs(subs) {
+        localStorage.setItem(SUBS_KEY, JSON.stringify(subs));
+      }
+
+      function escapeHtml(text) {
+        return text
+          .replaceAll('&', '&amp;')
+          .replaceAll('<', '&lt;')
+          .replaceAll('>', '&gt;')
+          .replaceAll('"', '&quot;')
+          .replaceAll("'", '&#39;');
+      }
+
+      function renderChat() {
+        chatEl.innerHTML = state.messages
+          .map(
+            (m) => `<div class="msg ${m.role === 'assistant' ? 'bot' : 'me'}">${escapeHtml(m.content)}</div>`
+          )
+          .join('');
+        chatEl.scrollTop = chatEl.scrollHeight;
+      }
+
+      function renderSubs() {
+        const subs = getSubs();
+        if (!subs.length) {
+          subsEl.innerHTML = '<li>لا يوجد تنبيهات محفوظة بعد.</li>';
+          return;
+        }
+
+        subsEl.innerHTML = subs
+          .map(
+            (s) => `<li><strong>${escapeHtml(s.title)}</strong><br><span style="color:#9ca3af">${escapeHtml(s.description)}</span></li>`
+          )
+          .join('');
+      }
+
+      async function askAI() {
+        if (!AI_CONFIG.apiKey || AI_CONFIG.apiKey.includes('PUT_YOUR_API_KEY_HERE')) {
+          state.messages.push({
+            role: 'assistant',
+            content: 'المفتاح غير مضبوط داخل الكود. حدّث AI_CONFIG.apiKey في ملف index.html.'
+          });
+          renderChat();
+          return;
+        }
+
+        const systemPrompt = `
+أنت مساعد عربي يبني تنبيه خبر دقيق عبر محادثة قصيرة.
+- اسأل سؤالاً واحداً محدداً في كل مرة حتى تكتمل الدقة.
+- عند الاكتمال أخرج JSON فقط:
+{"done":true,"reply":"...","subscription":{"title":"...","description":"..."}}
+- إذا لم يكتمل:
+{"done":false,"reply":"..."}
+- بدون أي نص خارج JSON.
+        `.trim();
+
+        const payload = {
+          model: AI_CONFIG.model,
+          temperature: 0.2,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...state.messages.map((m) => ({ role: m.role, content: m.content }))
+          ]
+        };
+
+        try {
+          const res = await fetch(`${AI_CONFIG.apiBase}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${AI_CONFIG.apiKey}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}`);
+          }
+
+          const data = await res.json();
+          const content = data?.choices?.[0]?.message?.content || '{}';
+          const parsed = JSON.parse(content);
+
+          if (typeof parsed.reply !== 'string') {
+            throw new Error('صيغة رد غير متوقعة');
+          }
+
+          state.messages.push({ role: 'assistant', content: parsed.reply });
+
+          if (parsed.done && parsed.subscription?.title && parsed.subscription?.description) {
+            const subs = getSubs();
+            subs.unshift({
+              title: parsed.subscription.title,
+              description: parsed.subscription.description,
+              createdAt: new Date().toISOString()
+            });
+            saveSubs(subs);
+            renderSubs();
+          }
+        } catch (err) {
+          state.messages.push({
+            role: 'assistant',
+            content: `تعذر الاتصال بالذكاء الاصطناعي: ${err.message}`
+          });
+        }
+
+        renderChat();
+      }
+
+      document.getElementById('sendBtn').addEventListener('click', async () => {
+        const text = userInput.value.trim();
+        if (!text) return;
+        state.messages.push({ role: 'user', content: text });
+        userInput.value = '';
+        renderChat();
+        await askAI();
+      });
+
+      userInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          document.getElementById('sendBtn').click();
+        }
+      });
+
+      renderChat();
+      renderSubs();
+    </script>
+  </body>
+</html>
