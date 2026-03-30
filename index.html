@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="Private bilingual problem discovery app (PWA)." />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Problem Discovery" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Problem Discovery App</title>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1 id="appTitle">Problem Discovery App</h1>
+      <p id="appSubtitle"></p>
+    </div>
+    <div class="lang-switch">
+      <label for="languageSelect" id="langLabel"></label>
+      <select id="languageSelect" aria-label="Language selector">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+      </select>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <nav class="bottom-nav" id="bottomNav" aria-label="Main navigation"></nav>
+
+  <template id="cardTemplate"><section class="card"></section></template>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
